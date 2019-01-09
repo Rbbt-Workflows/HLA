@@ -1,0 +1,7 @@
+#!/bin/bash
+
+name='HLAminer'
+url="https://github.com/warrenlr/HLAminer/blob/master/HLAminer_v1-3-1.tar.gz?raw=true"
+
+install_src "$name" "$url" 
+
