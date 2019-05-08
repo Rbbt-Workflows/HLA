@@ -14,9 +14,10 @@ HLA=/$PWD filter="*.rb *.rake Rakefile *.rdoc *.R *.sh *.js *.haml *.sass *.txt 
    }
   }
   tasks=HLA/tasks{
-   reads.rb
-   typing.rb
    alignment.rb
+   reads.rb
+   sample.rb
+   typing.rb
   }
  }
  test=test {
