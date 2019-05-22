@@ -8,6 +8,7 @@ require 'rbbt/sources/SOAPHLA'
 require 'rbbt/sources/opti_type'
 require 'rbbt/sources/LOHHLA'
 require 'rbbt/sources/POLYSOLVER'
+require 'rbbt/sources/xHLA'
 
 Workflow.require_workflow "HTS"
 require 'tools/IGV'

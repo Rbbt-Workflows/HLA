@@ -11,13 +11,14 @@ HLA=/$PWD filter="*.rb *.rake Rakefile *.rdoc *.R *.sh *.js *.haml *.sass *.txt 
     POLYSOLVER.rb
     SOAPHLA.rb
     opti_type.rb
+    xHLA.rb
    }
   }
   tasks=HLA/tasks{
    alignment.rb
    reads.rb
-   sample.rb
    typing.rb
+   sample.rb
   }
  }
  test=test {

@@ -12,6 +12,7 @@ DIR="$(opt_dir $name)"
 (cd "$DIR";
 perl MHC_typing_construct.pl Data_imgt_txt Data_type_hg19 hg19;
 perl MHC_typing_construct.pl Data_imgt_txt Data_type_hg18 hg18;
+perl MHC_typing_construct.pl Data_imgt_txt Data_type_hg38 hg38;
 cat MHC_autopipeline.pl | sed 's/chr6/6/g' > MHC_autopipeline.b37.pl
 )
 
