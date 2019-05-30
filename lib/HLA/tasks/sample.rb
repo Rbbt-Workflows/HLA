@@ -15,35 +15,66 @@ module Sample
   #  }.flatten.compact
   #end
 
-  dep :BAM_normal, :compute => [:produce, :canfail]
-  dep :BAM, :compute => :produce
-  input :reference, :select, "Reference code", "b37", :select_options => %w(b37 hg19 hg38 GRCh38 hs37d5), :nofile => true
-  dep_task :SOAPHLA, HLA, :SOAPHLA, :BAM => :BAM_normal, :reference => :reference do |jobname,options,dependencies|
-    options[:BAM] = :BAM if dependencies.select{|dep| dep.task_name == :BAM_normal}.first.nil?
-    {:inputs => options}
-  end
+  #dep :BAM_normal, :compute => [:produce, :canfail]
+  #dep :BAM, :compute => :produce
+  #input :reference, :select, "Reference code", "b37", :select_options => %w(b37 hg19 hg38 GRCh38 hs37d5), :nofile => true
+  #dep_task :SOAPHLA, HLA, :SOAPHLA, :BAM => :BAM_normal, :reference => :reference do |jobname,options,dependencies|
+  #  options[:BAM] = :BAM if dependencies.select{|dep| dep.task_name == :BAM_normal}.first.nil?
+  #  {:inputs => options}
+  #end
 
-  dep :BAM_normal, :compute => [:produce, :canfail]
-  dep :BAM, :compute => :produce
-  input :reference, :select, "Reference code", "b37", :select_options => %w(b37 hg19 hg38 GRCh38 hs37d5), :nofile => true
-  dep_task :polysolver, HLA, :polysolver, :bam => :BAM_normal, :reference => :reference do |jobname,options,dependencies|
-    options[:bam] = :BAM if dependencies.select{|dep| dep.task_name == :BAM_normal}.first.nil?
-    {:inputs => options}
-  end
+  #dep :BAM_normal, :compute => [:produce, :canfail]
+  #dep :BAM, :compute => :produce
+  #input :reference, :select, "Reference code", "b37", :select_options => %w(b37 hg19 hg38 GRCh38 hs37d5), :nofile => true
+  #dep_task :polysolver, HLA, :polysolver, :bam => :BAM_normal, :reference => :reference do |jobname,options,dependencies|
+  #  options[:bam] = :BAM if dependencies.select{|dep| dep.task_name == :BAM_normal}.first.nil?
+  #  {:inputs => options}
+  #end
 
-  dep_task :OptiType, HLA, :OptiType do |sample,options|
-    sample_files = Sample.sample_files sample
-    raise "Sample #{ sample } not found" if sample_files.nil?
+  #dep_task :OptiType, HLA, :OptiType do |sample,options|
+  #  sample_files = Sample.sample_files sample
+  #  raise "Sample #{ sample } not found" if sample_files.nil?
 
-    options = add_sample_options sample, options
+  #  options = add_sample_options sample, options
 
-    if fastq_files = sample_files[:FASTQ]
-      options = options.merge({:files => fastq_files.flatten.uniq})
-      {:inputs => options, :jobname => sample}
-    else
-      raise ParameterException, "No fastq files for sample #{sample}"
-    end
-  end
+  #  if fastq_files = sample_files[:FASTQ]
+  #    options = options.merge({:files => fastq_files.flatten.uniq})
+  #    {:inputs => options, :jobname => sample}
+  #  else
+  #    raise ParameterException, "No fastq files for sample #{sample}"
+  #  end
+  #end
+
+  #dep :BAM_normal, :compute => [:produce, :canfail]
+  #dep :BAM, :compute => :produce
+  #input :reference, :select, "Reference code", "b37", :select_options => %w(b37 hg19 hg38 GRCh38 hs37d5), :nofile => true
+  #dep_task :SOAPHLA, HLA, :SOAPHLA, :BAM => :BAM_normal, :reference => :reference do |jobname,options,dependencies|
+  #  options[:BAM] = :BAM if dependencies.select{|dep| dep.task_name == :BAM_normal}.first.nil?
+  #  {:inputs => options}
+  #end
+
+
+  #dep_task :OptiType, HLA, :OptiType do |sample,options|
+  #  sample_files = Sample.sample_files sample
+  #  raise "Sample #{ sample } not found" if sample_files.nil?
+
+  #  options = add_sample_options sample, options
+
+  #  if fastq_files = sample_files[:FASTQ]
+  #    options = options.merge({:files => fastq_files.flatten.uniq})
+  #    {:inputs => options, :jobname => sample}
+  #  else
+  #    raise ParameterException, "No fastq files for sample #{sample}"
+  #  end
+  #end
+
+  #dep :BAM_normal, :compute => [:produce, :canfail]
+  #dep :BAM, :compute => :produce
+  #input :reference, :select, "Reference code", "b37", :select_options => %w(b37 hg19 hg38 GRCh38 hs37d5), :nofile => true
+  #dep_task :polysolver, HLA, :polysolver, :bam => :BAM_normal, :reference => :reference do |jobname,options,dependencies|
+  #  options[:bam] = :BAM if dependencies.select{|dep| dep.task_name == :BAM_normal}.first.nil?
+  #  {:inputs => options}
+  #end
 
   dep :BAM, :compute => :produce
   dep :BAM_normal, :compute => [:produce, :canfail]
@@ -132,39 +163,13 @@ module Sample
     adbs.keys
   end
 
-  dep :BAM_normal, :compute => [:produce, :canfail]
-  dep :BAM, :compute => :produce
-  input :reference, :select, "Reference code", "b37", :select_options => %w(b37 hg19 hg38 GRCh38 hs37d5), :nofile => true
-  dep_task :SOAPHLA, HLA, :SOAPHLA, :BAM => :BAM_normal, :reference => :reference do |jobname,options,dependencies|
-    options[:BAM] = :BAM if dependencies.select{|dep| dep.task_name == :BAM_normal}.first.nil?
-    {:inputs => options}
-  end
-
-  dep :BAM_normal, :compute => [:produce, :canfail]
-  dep :BAM, :compute => :produce
-  input :reference, :select, "Reference code", "b37", :select_options => %w(b37 hg19 hg38 GRCh38 hs37d5), :nofile => true
-  dep_task :polysolver, HLA, :polysolver, :bam => :BAM_normal, :reference => :reference do |jobname,options,dependencies|
-    options[:bam] = :BAM if dependencies.select{|dep| dep.task_name == :BAM_normal}.first.nil?
-    {:inputs => options}
-  end
-
-  dep_task :OptiType, HLA, :OptiType do |sample,options|
-    sample_files = Sample.sample_files sample
-    raise "Sample #{ sample } not found" if sample_files.nil?
-
-    options = add_sample_options sample, options
-
-    if fastq_files = sample_files[:FASTQ]
-      options = options.merge({:files => fastq_files.flatten.uniq})
-      {:inputs => options, :jobname => sample}
-    else
-      raise ParameterException, "No fastq files for sample #{sample}"
-    end
-  end
-
   dep :genomic_mutations, :compute => :produce
   dep :hla_genotype, :compute => :produce
-  dep PVacSeq, :analysis, :positions => :genomic_mutations, :alleles => :hla_genotype
+  dep PVacSeq, :analysis, :positions => :genomic_mutations, :alleles => :hla_genotype do |jobname,options|
+    options = add_sample_options jobname, options
+    options.merge!(:organism => Organism.organism_for_build(options[:reference]))
+    {:inputs => options, :jobname => jobname}
+  end
   task :neo_epitopes => :tsv do
 
     organism = self.recursive_inputs[:organism] 
