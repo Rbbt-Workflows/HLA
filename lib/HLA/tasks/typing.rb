@@ -53,22 +53,59 @@ module HLA
 
   input :files, :array, "List of fastq files", nil, :nofile => true
   dep :HLA_reads, :fastq1 => :placeholder, :fastq2 => nil do |jobname, options|
-    options[:files].collect do |file|
-      {:inputs => {:fastq1 => file}, :jobname => jobname}
+    if options[:files] 
+      options[:files].collect do |file|
+        {:inputs => {:fastq1 => file}, :jobname => jobname}
+      end
+    else
+      []
     end
   end
   task :OptiType => :text do
 
     fastqs = dependencies.collect{|d| d.path }
 
-    output = files_dir
+    output = file('output')
+    inputs = file('input')
+    `chmod 777 -R #{output}`
     begin
-      CMD.cmd("python #{Rbbt.software.opt.OptiType.produce["OptiTypePipeline.py"].find} -i #{fastqs.collect{|f| "'#{f}'"} * " "} --dna -v -o '#{output}' ")
+      fastqs_2 = dependencies.select{|d| d.recursive_inputs[:fastq1] =~ /_2\.fastq/}.collect{|d| d.path }
+      fastqs_1 = fastqs - fastqs_2
+
+      fastq1 = inputs["fastq1.fastq"]
+      Open.open(fastq1, :mode => 'w') do |fin|
+        fastqs_1.each do |fastq|
+          Open.open(fastq) do |fout|
+            Misc.consume_stream fout, false, fin, false
+          end
+        end
+        fin.close
+      end if fastqs_1.any?
+
+      fastq2 = inputs["fastq2.fastq"]
+      Open.open(fastq2, :mode => 'w') do |fin|
+        fastqs_2.each do |fastq|
+          Open.open(fastq) do |fout|
+            Misc.consume_stream fout, false, fin, false
+          end
+        end
+        fin.close
+      end if fastqs_2.any?
+
+      fastqs = []
+      fastqs << fastq1 if fastqs_1.any?
+      fastqs << fastq2 if fastqs_2.any?
+
+      #Docker.run('fred2/optitype',"-i #{fastqs.collect{|p| "/job/" << File.basename(p) } * " "} --dna -v -o /data/", :mounts => {"/data/" => output}, :directory => inputs)
+      CMD.cmd_log("python #{Rbbt.software.opt.OptiType.produce["OptiTypePipeline.py"].find} -i #{fastqs.collect{|f| "'#{f}'"} * " "} --dna -v -o '#{output}'")
     rescue
+      Log.exception $!
       raise RbbtException, "Error in python: #{$!.message}"
+    ensure
+      Open.rm_rf inputs
     end
 
-    res = Dir.glob(files_dir + '/**/*.tsv').first
+    res = Dir.glob(output + '/**/*.tsv').first
 
     FileUtils.cp res, self.path
     nil
