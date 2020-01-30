@@ -12,17 +12,20 @@ HLA=/$PWD filter="*.rb *.rake Rakefile *.rdoc *.R *.sh *.js *.haml *.sass *.txt 
     SOAPHLA.rb
     opti_type.rb
     xHLA.rb
+    ArcasHLA.rb
    }
   }
   tasks=HLA/tasks{
    alignment.rb
    reads.rb
    typing.rb
+   epitopes.rb
    sample.rb
   }
  }
  test=test {
   test_helper.rb
+  test_epitopes_pvac.rb
  }
  data=data filter="*"{
  }

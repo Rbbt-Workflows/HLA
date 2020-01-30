@@ -1,8 +1,10 @@
 module HLA
 
-  input :fastq1, :file, "FASTQ file"
-  input :fastq2, :file, "FASTQ file 2", nil
-  dep :reference => HLA_REFERENCE do |jobname,options|
+  input :fastq1, :file, "FASTQ file", nil, :nofile => true
+  input :fastq2, :file, "FASTQ file 2", nil, :nofile => true
+  input :filter_aligner, :select, "Aligner to use", :bwa, :select_options => %w(novoalign bwa razers3 bowtie)
+  extension "fastq.gz"
+  dep_task :HLA_reads, HTS, :bwa_filter, :reference => HLA_REFERENCE do |jobname,options|
     case options[:filter_aligner].to_s
     when "bwa"
       {:inputs => options, :workflow => HTS, :task => 'bwa_filter', :jobname => jobname}
@@ -17,12 +19,6 @@ module HLA
     else
       raise ParameterException, "Cannot find aligner: #{options[:aligner].to_s}"
     end
-  end
-  input :filter_aligner, :select, "Aligner to use", :bwa, :select_options => %w(novoalign bwa razers3)
-  extension "fastq.gz"
-  task :HLA_reads => :binary do |aligner|
-    FileUtils.ln_s dependencies.first.path, self.path
-    nil
   end
 
 end

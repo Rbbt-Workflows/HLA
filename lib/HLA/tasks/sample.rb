@@ -14,7 +14,7 @@ module Sample
     options[:bam] = :BAM if dependencies.flatten.select{|dep| dep.done? &&  dep.task_name == :BAM_normal}.first.nil?
     {:inputs => options, :jobname => jobname.gsub(":", '_')}
   end
-  dep HLA, :OptiType, :compute => :canfail do |sample,options|
+  dep HLA, :OptiType, :compute => [:produce, :canfail] do |sample,options|
 
     fastq_files = nil
 
@@ -40,11 +40,18 @@ module Sample
     options[:bam] = :BAM if dependencies.flatten.select{|dep| dep.task_name == :BAM_normal}.first.nil?
     {:inputs => options, :jobname => jobname.gsub(":", '_')}
   end
+  dep HLA, :arcasHLA, :compute => [:produce, :canfail], :bam => :BAM_normal do |jobname,options,dependencies|
+    options = add_sample_options jobname, options
+    options[:bam] = :BAM if dependencies.flatten.select{|dep| dep.task_name == :BAM_normal}.first.nil?
+    {:inputs => options, :jobname => jobname.gsub(":", '_')}
+  end
   task :hla_typing => :tsv do
     tsv = TSV.setup({}, :key_field => "Allele", :fields => ["Method"], :type => :flat)
     dependencies.each do |dep|
       next if dep.error?
       case dep.task_name
+      when :BAM, :BAM_normal
+        next
       when :xHLA
         dep.load.each do |allele|
           tsv[allele] ||= []
@@ -68,6 +75,11 @@ module Sample
           tsv[allele2] ||= []
           tsv[allele1] << "Polysolver"
           tsv[allele2] << "Polysolver"
+        end
+      else
+        dep.path.read.split(/\s/).select{|w| w.include? "*"}.each do |allele|
+          tsv[allele] ||= []
+          tsv[allele] << dep.task_name
         end
       end
     end
@@ -113,18 +125,19 @@ module Sample
     adbs.keys
   end
 
-  
   dep :vcf_file, :compute => :produce
   dep :hla_genotype, :compute => :produce
-  dep PVacSeq, :analysis, :vcf_file => :vcf_file, :alleles => :hla_genotype do |jobname,options,dependencies|
+  dep_task :pvacseq, PVacSeq, :analysis, :vcf_file => :vcf_file, :alleles => :hla_genotype do |jobname,options,dependencies|
     options = add_sample_options jobname, options
     options.merge!(:organism => Organism.organism_for_build(options[:reference]))
     {:inputs => options, :jobname => jobname}
   end
+  
+  dep :pvacseq
   task :neo_epitopes => :tsv do
 
     organism = self.recursive_inputs[:organism] 
-    parser = TSV::Parser.new step(:analysis).join, :type => :list
+    parser = TSV::Parser.new step(:pvacseq).join, :type => :list
     dumper = TSV::Dumper.new parser.options.merge(:key_field => "Genomic Mutation", :namespace => organism, :fields => parser.fields[4..-1])
     dumper.init
     TSV.traverse parser, :into => dumper do |chr, values|
@@ -138,5 +151,104 @@ module Sample
     end
   end
 
+  dep :mi
+  dep_task :epitopes, HLA, :epitopes, :mutated_isoforms => :mi do |jobname, options|
+    options = add_sample_options jobname, options
+    options.merge!(:organism => Organism.organism_for_build(options[:reference])) if options[:organism].nil?
+    {:inputs => options, :jobname => jobname}
+  end
+
+  dep :epitopes
+  dep :hla_genotype
+  dep_task :mhcFlurry, HLA, :mhcFlurry, "HLA#epitopes" => :epitopes, :alleles => :hla_genotype do |jobname, options|
+    options = add_sample_options jobname, options
+    options.merge!(:organism => Organism.organism_for_build(options[:reference])) if options[:organism].nil?
+    {:inputs => options, :jobname => jobname}
+  end
+
+  dep :salmon
+  task :gene_expression => :tsv do
+    dumper = TSV::Dumper.new :key_field => "Ensembl Transcript ID", :fields => ["TPM"], :type => :single, :cast => :to_f
+    dumper.init
+    TSV.traverse step(:salmon), :header_hash => "", :type => :list, :into => dumper do |name,values|
+      length, eff_length, tpm, reads = values
+      transcript = name.split(".").first
+      [transcript, tpm]
+    end
+  end
+
+  dep :expanded_vcf
+  dep :genomic_mutations
+  dep :genomic_mutation_consequence
+  dep :epitopes 
+  dep :mhcFlurry 
+  dep :gene_expression, :compute => :canfail
+  dep :RNA_BAM, :compute => :canfail
+  dep HTS, :BAM_position_pileup, :BAM => :RNA_BAM, :compute => :canfail, :positions => :genomic_mutations do |jobname,options,dependencies|
+    if rna_bam = dependencies.select{|d| d.task_name == :RNA_BAM}.first
+      reference = rna_bam.recursive_inputs[:reference]
+      {:inputs => {:reference => reference}.merge(options), :jobname => jobname}
+    else
+      nil
+    end
+  end
+  task :epitope_features => :tsv do
+    organism = step(:genomic_mutation_consequence).recursive_inputs[:organism]
+    organism = organism.load if Step === organism
+
+    tsv = step(:epitopes).load.reorder "Mutated", nil, :zipped => true, :merge => true
+
+    prot2enst = Organism.transcripts(organism).tsv :key_field => "Ensembl Protein ID", :fields => ["Ensembl Transcript ID"], :persist => true, :type => :single
+    tsv = tsv.attach step(:genomic_mutation_consequence), :fields => ["Genomic Mutation"]
+    tsv.add_field "Ensembl Transcript ID" do |mi,values|
+      values["Mutated Isoform"].collect do |mi|
+        protein = mi.split(":").first
+        enst = prot2enst[protein]
+        enst
+      end
+    end
+
+    tsv = tsv.attach step(:gene_expression)
+    tsv = tsv.attach step(:expanded_vcf)
+
+    if step(:BAM_position_pileup).done?
+      pileup = step(:BAM_position_pileup).load
+      tsv.add_field "RNA Support" do |k,v|
+        mutations = v["Genomic Mutation"]
+        mutations.collect{|mutation|
+          position = mutation.split(":").values_at(0,1) * ":"
+          values = pileup[position]
+          if values
+            values["Alt count"]
+          end
+        }
+      end
+      tsv.add_field "RNA VAF" do |k,v|
+        mutations = v["Genomic Mutation"]
+        mutations.collect{|mutation|
+          position = mutation.split(":").values_at(0,1) * ":"
+          values = pileup[position]
+          if values
+            values["Alt count"].to_f / values["Ref count"].to_f
+          end
+        }
+      end
+    end
+
+    mhcFlurry = step(:mhcFlurry).load
+    mhcFlurry.add_field "Mutated" do |k,v|
+      v["Mutated epitope"]
+    end
+
+    alleles = mhcFlurry.column("Allele").values.flatten.compact.uniq
+
+    orig_fields = mhcFlurry.fields
+    alleles.each do |allele|
+      mhcFlurry.fields = orig_fields.collect{|f| f.include?("mhcflurry") ? f + " (#{allele})" : f}
+      tsv = tsv.attach mhcFlurry.select("Allele" => allele), :fields => mhcFlurry.fields.select{|f| f.include? "mhcflurry"}
+    end
+
+    tsv
+  end
 
 end

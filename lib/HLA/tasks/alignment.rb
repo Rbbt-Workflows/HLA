@@ -40,16 +40,16 @@ module HLA
     nil
   end
 
-  dep HLA, :HLA_reads, :filter_aligner => :bowtie
   dep HLA, :HLA_fasta, :compute => :produce
-  dep HTS, :BAM, :reference => :HLA_fasta, :fastq1 => :HLA_reads, :fastq2 => nil do |jobname,options|
+  dep HLA, :HLA_reads, :reference => :HLA_fasta
+  dep HTS, :BAM_bwa, :reference => :HLA_fasta, :fastq1 => :HLA_reads, :fastq2 => nil do |jobname,options|
     options[:fastq1] = :HLA_reads
     options[:fastq2] = nil
     case options[:aligner].to_s
     when "bwa"
-      {:inputs => options.merge(:bwa_mem_args => '-a'), :workflow => HTS, :task => 'BAM', :jobname => jobname}
+      {:inputs => options.merge(:bwa_mem_args => '-a', :reference => :HLA_fasta), :task => :BAM_bwa, :workflow => HTS, :jobname => jobname}
     when "razers3"
-      {:inputs => options.merge(:m => 1000), :workflow => HTS, :task => 'razers3_BAM', :jobname => jobname}
+      {:inputs => options.merge(:m => 1000, :reference => :HLA_fasta), :workflow => HTS, :task => 'razers3_BAM', :jobname => jobname}
     when "novoalign"
       {:inputs => options, :workflow => HTS, :task => 'novoalign_BAM', :jobname => jobname}
     when "bowtie"
@@ -63,7 +63,7 @@ module HLA
   input :aligner, :select, "Aligner to use", :bwa, :select_options => %w(bwa razers3 novoalign bowtie)
   extension :bam
   task :HLA_BAM => :binary do |aligner|
-    if aligner != 'razers3'
+    if aligner.to_s != 'razers3' and aligner.to_s != 'novoalign'
       CMD.cmd_log("samtools view -h '#{dependencies.last.path}' | grep '^@\\|XM:i:0\\s' | samtools view -h -b   - > '#{self.tmp_path}'")
     else
       Open.ln_s dependencies.last.path, self.tmp_path
@@ -77,18 +77,25 @@ module HLA
   input :image_format, :select, "Format for images", :png, :select_options => %w(png svg jpeg)
   input :complete_alleles, :boolean, "Add missing fields in allele names when not found", false
   task :allele_alignment => :array do |alleles,image_format,complete_alleles|
-    step = step(:HLA_BAM)
 
-    hla_reference = step.info[:hla_reference]
+    hla_reference = step(:HLA_BAM).recursive_inputs[:reference]
+    hla_reference = hla_reference.path if Step === hla_reference
+
     snapshot = file('snapshots')
 
-    alignment = Samtools.prepare_BAM(step.path)
+    alignment = Samtools.prepare_BAM(step(:HLA_BAM).path)
 
     allele_info = self.allele_info alleles
+    if Open.gzip?(hla_reference)
+      Open.mkdir files_dir
+      hla_reference_unzip = file('hla_reference.fasta')
+      CMD.cmd("gunzip '#{hla_reference}' -c > '#{hla_reference_unzip}'")
+      hla_reference = hla_reference_unzip
+    end
 
     if allele_info.any?
 
-      IGV.run <<-EOF, 10000
+      IGV.run <<-EOF, 10_000, 10_000
 new
 genome #{hla_reference}
 load #{alignment}

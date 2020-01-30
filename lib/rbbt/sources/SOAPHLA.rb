@@ -17,15 +17,15 @@ module SOAPHLA
     tmp_file = file
     Misc.in_dir Rbbt.software.opt.SOAPHLA.produce.find do 
       name = File.basename(tmp_file, '.bam')
-      if build == 'b37'
-        CMD.cmd_log("perl MHC_autopipeline.b37.pl -i '#{tmp_file}' -od '#{dir}' -v #{version}", :log => true)
-      else
-        CMD.cmd_log("perl MHC_autopipeline.pl -i '#{tmp_file}' -od '#{dir}' -v #{version}", :log => true)
+      begin
+        if build == 'b37'
+          CMD.cmd_log("perl MHC_autopipeline.b37.pl -i '#{tmp_file}' -od '#{dir}' -v #{version}")
+        else
+          CMD.cmd_log("perl MHC_autopipeline.pl -i '#{tmp_file}' -od '#{dir}' -v #{version}")
+        end
+      rescue ProcessFailed
+        raise RbbtException, "Error running SOAPHLA command"
       end
-      #dir[name].glob.each do |outfile|
-      #  FileUtils.mv outfile, dir[File.basename(outfile)]
-      #end
-      #FileUtils.rm_rf dir[name]
     end
   end
 

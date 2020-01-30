@@ -1,7 +1,7 @@
 module HLA
 
   input :bam, :file, "Tumor BAM", nil, :nofile => true
-  input :reference, :select, "Reference code", "hg19", :select_options => %w(b37 hg38)
+  input :reference, :select, "Reference code", "b37", :select_options => %w(b37 hg38)
   task :polysolver => :text do |bam,reference|
     directory = file('workdir').find
     bam = File.expand_path(bam)
@@ -11,6 +11,8 @@ module HLA
       Open.ln_h File.expand_path(bam), bam_file
       Open.ln_h prepared_bam + '.bai', bam_file + '.bai'
       POLYSOLVER.run(directory, reference)
+    rescue Exception
+      raise RbbtException, "Polysolver could not run"
     ensure
       Open.rm bam_file if File.exists?(bam_file)
       Open.rm bam_file + '.bai' if File.exists?(bam_file + '.bai')
@@ -31,6 +33,8 @@ module HLA
       Open.ln_h File.expand_path(bam), bam_file
       Open.ln_h prepared_bam + '.bai', bam_file + '.bai'
       XHLA.run(directory, reference)
+    rescue Exception
+      raise RbbtException, "XHLA could not run"
     ensure
       Open.rm bam_file if File.exists?(bam_file)
       Open.rm bam_file + '.bai' if File.exists?(bam_file + '.bai')
@@ -51,10 +55,64 @@ module HLA
     files.first.read
   end
 
+  input :BAM, :file, "BAM file", nil, :nofile => true
+  task :arcasHLA => :array do |bam|
+    alleles = %w(A B C DPB1 DQB1 DQA1 DRB1)
+    output = file('output')
+    bam = Samtools.prepare_BAM bam
+    ArcasHLA.run(bam,alleles,output).values.flatten.uniq
+  end
+  
   input :files, :array, "List of fastq files", nil, :nofile => true
   dep :HLA_reads, :fastq1 => :placeholder, :fastq2 => nil do |jobname, options|
     if options[:files] 
       options[:files].collect do |file|
+        {:inputs => {:fastq1 => file}, :jobname => jobname}
+      end
+    else
+      []
+    end
+  end
+  task :arcasHLA_reads => :array do 
+    alleles = %w(A B C DPB1 DQB1 DQA1 DRB1)
+    output = file('output')
+    inputs = file('input')
+
+    fastqs = dependencies.collect{|dep| dep.path}
+    fastqs_2 = dependencies.select{|d| d.recursive_inputs[:fastq1] =~ /_2\.fastq/}.collect{|d| d.path }
+    fastqs_1 = fastqs - fastqs_2
+
+    fastq1 = inputs["fastq1.fastq"]
+    Open.open(fastq1, :mode => 'w') do |fin|
+        fastqs_1.each do |fastq|
+          Open.open(fastq) do |fout|
+            Misc.consume_stream fout, false, fin, false
+          end
+        end
+        fin.close
+    end if fastqs_1.any?
+
+    fastq2 = inputs["fastq2.fastq"]
+    Open.open(fastq2, :mode => 'w') do |fin|
+      fastqs_2.each do |fastq|
+        Open.open(fastq) do |fout|
+          Misc.consume_stream fout, false, fin, false
+        end
+      end
+      fin.close
+    end if fastqs_2.any?
+
+    ArcasHLA.run_fasta(fastq1, fastq2,alleles,output).values.flatten.uniq
+  end
+
+
+  input :files, :array, "List of fastq files", nil, :nofile => true
+  dep :HLA_reads, :fastq1 => :placeholder, :fastq2 => nil do |jobname, options|
+    if options[:files] 
+      files = options[:files]
+      files = [files] unless Array === files
+      files.collect do |file|
+        file = file.path if Step === file
         {:inputs => {:fastq1 => file}, :jobname => jobname}
       end
     else

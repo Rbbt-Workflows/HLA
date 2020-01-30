@@ -9,6 +9,7 @@ require 'rbbt/sources/opti_type'
 require 'rbbt/sources/LOHHLA'
 require 'rbbt/sources/POLYSOLVER'
 require 'rbbt/sources/xHLA'
+require 'rbbt/sources/ArcasHLA'
 
 Workflow.require_workflow "HTS"
 require 'tools/IGV'
@@ -25,6 +26,7 @@ end
 require 'HLA/tasks/reads.rb'
 require 'HLA/tasks/typing.rb'
 require 'HLA/tasks/alignment.rb'
+require 'HLA/tasks/epitopes.rb'
 
 #require 'rbbt/knowledge_base/HLA'
 #require 'rbbt/entity/HLA'
