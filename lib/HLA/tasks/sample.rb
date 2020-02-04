@@ -133,14 +133,14 @@ module Sample
     {:inputs => options, :jobname => jobname}
   end
   
-  dep :pvacseq
+  dep :pvacseq, :compute => :produce
   task :neo_epitopes => :tsv do
 
     organism = self.recursive_inputs[:organism] 
+
     parser = TSV::Parser.new step(:pvacseq).join, :type => :list
-    dumper = TSV::Dumper.new parser.options.merge(:key_field => "Genomic Mutation", :namespace => organism, :fields => parser.fields[4..-1])
-    dumper.init
-    TSV.traverse parser, :into => dumper do |chr, values|
+    tsv = TSV.setup({}, parser.options.merge(:key_field => "Genomic Mutation", :namespace => organism, :fields => parser.fields[4..-1]))
+    TSV.traverse parser, :into => tsv do |chr, values|
       start, eend, ref, mut, *rest = values
       start = start.to_i
       start = start + 1 if ref.length == 1 && mut.length == 1
@@ -149,6 +149,22 @@ module Sample
       mutation = [chr, pos, muts.first] * ":"
       [mutation, values[4..-1]]
     end
+    
+    parser = TSV::Parser.new step(:pvacseq).file("output/MHC_Class_I/#{clean_name}.all_epitopes.tsv"), :header_hash => '', :type => :list
+    all = TSV.setup({}, parser.options.merge(:key_field => "Genomic Mutation", :namespace => organism, :fields => parser.fields[4..-1]))
+    TSV.traverse parser, :into => all do |chr, values|
+      start, eend, ref, mut, *rest = values
+      start = start.to_i
+      start = start + 1 if ref.length == 1 && mut.length == 1
+      pos, muts = Misc.correct_vcf_mutation start, ref, mut
+
+      mutation = [chr, pos, muts.first] * ":"
+      [mutation, values[4..-1]]
+    end
+    
+    Open.write(file('all.tsv'), all.to_s)
+
+    tsv
   end
 
   dep :mi
