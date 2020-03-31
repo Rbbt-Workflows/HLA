@@ -6,12 +6,12 @@ module Sample
   dep :BAM_normal, :compute => [:produce, :canfail]
   dep HLA, :SOAPHLA, :compute => [:produce, :canfail], :BAM => :BAM_normal do |jobname,options,dependencies|
     options = add_sample_options jobname, options
-    options[:BAM] = :BAM if dependencies.flatten.select{|dep| dep.done? && dep.task_name == :BAM_normal}.first.nil?
+    options[:BAM] = options[:bam] = :BAM if dependencies.flatten.reject{|dep| (dep.dependencies.empty? ) || (dep.error? && ! dep.recoverable_error?) }.select{|dep|  dep.task_name == :BAM_normal}.first.nil?
     {:inputs => options, :jobname => jobname}
   end
   dep HLA, :polysolver, :compute => [:produce, :canfail], :bam => :BAM_normal do |jobname,options,dependencies|
     options = add_sample_options jobname, options
-    options[:bam] = :BAM if dependencies.flatten.select{|dep| dep.done? &&  dep.task_name == :BAM_normal}.first.nil?
+    options[:BAM] = options[:bam] = :BAM if dependencies.flatten.reject{|dep| (dep.dependencies.empty? ) || (dep.error? && ! dep.recoverable_error?) }.select{|dep|  dep.task_name == :BAM_normal}.first.nil?
     {:inputs => options, :jobname => jobname.gsub(":", '_')}
   end
   dep HLA, :OptiType, :compute => [:produce, :canfail] do |sample,options|
@@ -21,13 +21,14 @@ module Sample
     nsample = nil
     sample_study = Sample.sample_study(sample)
     sample_files = nil
-    [sample, sample + '_normal', [sample_study, "normal"] * ":"].each do |normal_sample|
+    [sample, sample.sub('_normal', ''), sample + '_normal', [sample_study, "normal"] * ":"].uniq.each do |normal_sample|
       nsample = normal_sample
       sample_files = Sample.sample_files normal_sample if sample_study == Sample.sample_study(nsample)
       break if sample_files && fastq_files = sample_files[:FASTQ]
     end
 
-    if fastq_files = sample_files[:FASTQ]
+
+    if sample_files && fastq_files = sample_files[:FASTQ]
       options = add_sample_options nsample, options
       options = options.merge({:files => fastq_files.flatten.uniq})
       {:inputs => options, :jobname => sample}
