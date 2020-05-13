@@ -180,8 +180,6 @@ module HLA
         c_flank = wt_sequence[(pos-1)..pos+flank_size-2]
       end
 
-      iii mi
-      iif [flank_size, n_flank, + n_flank]
       n_flank = "-" * (flank_size - n_flank.length) + n_flank
       c_flank = c_flank + "-" * (flank_size - c_flank.length)
       [mi, [lost, pos, n_flank, pos_str, c_flank]]
