@@ -43,7 +43,7 @@ module Sample
   end
   dep HLA, :arcasHLA, :compute => [:produce, :canfail], :bam => :BAM_normal do |jobname,options,dependencies|
     options = add_sample_options jobname, options
-    options[:bam] = :BAM if dependencies.flatten.select{|dep| dep.task_name == :BAM_normal}.first.nil?
+    options[:BAM] = :BAM if dependencies.flatten.select{|dep| dep.task_name == :BAM_normal && ! dep.error?}.first.nil?
     {:inputs => options, :jobname => jobname.gsub(":", '_')}
   end
   task :hla_typing => :tsv do

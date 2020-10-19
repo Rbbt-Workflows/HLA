@@ -378,7 +378,7 @@ module HLA
     cpus = config("cpus", :mchflurry, :neo_epitopes, :default => 3)
     Open.write(input, str)
     cmd = "env MHCFLURRY_DOWNLOADS_DIR='#{Rbbt.share.databases.mhcflurry.find}' mhcflurry-predict"
-    cmd << " --threads #{cpus}" if cpus
+    cmd << " --threads #{cpus}" if false && cpus
     CMD.cmd_log(cmd + " #{ input } --out #{output}" )
 
     mhcflurry_scores = {}
